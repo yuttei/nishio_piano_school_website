@@ -1,19 +1,15 @@
 # 内容フォルダの形式
 
-サイトの文章・料金・空き状況・イベント・リンク・写真は、コードとは別の「内容フォルダ」に置く。ビルドと開発サーバーは、骨組みのHTML（`index.html` など）に内容フォルダの本文や部品を差し込み、4ページ（ホーム・レッスン・イベント・無料体験）を作る。
+サイトの文章・料金・空き状況・イベント・リンク・写真は、コードとは別の「内容フォルダ」（非公開リポジトリ `website_content`）に置く。ビルドと開発サーバーは、骨組みのHTML（`index.html` など）に内容フォルダの本文や部品を差し込み、4ページ（ホーム・レッスン・イベント・無料体験）を作る。
 
-| 内容フォルダ | 置き場所 | 使い方 |
-| --- | --- | --- |
-| 見本 | このリポジトリの `content-sample/` | `npm run dev`、`npm run build` |
-| 実際の内容 | 非公開リポジトリ `website_content`（`website` の兄弟フォルダ `../website_content`） | `npm run dev:real`、`npm run build:real` |
-
-- 見本と実際の内容は同じ形式
+- 既定の置き場所：`website` の兄弟フォルダ（`../website_content`）
+- 使い方：内容フォルダを用意し、`npm run dev`・`npm run build` を実行
 - この文書の形式の版は `formatVersion: 1`
 
 ## フォルダの構成
 
 ```text
-content-sample/
+website_content/
 ├── site.json          教室全体の情報とリンク、各ページの題名と説明文
 ├── data.json          トップの写真、空き状況の既定値、イベントの一覧
 ├── pages/
@@ -28,11 +24,12 @@ content-sample/
 
 ## 内容フォルダの指定
 
-- 環境変数 `SITE_CONTENT_DIR` で指定し、未指定なら `content-sample`
+- 環境変数 `SITE_CONTENT_DIR` で指定し、未指定なら兄弟フォルダ `../website_content`
 - 相対パスはプロジェクトのフォルダ（`vite.config.ts` のあるフォルダ）から解決
 - `.env` ファイルにも書けるが、コマンドの前に付けた環境変数のほうが優先
 - 起動時に `内容フォルダ: （フォルダの絶対パス）` を表示
-- シンボリックリンクをたどった実際の場所が、プロジェクトの中で `content-sample` 以外のフォルダならエラー（非公開の内容を公開リポジトリに入れないため）
+- 内容フォルダが見つからない場合はエラー
+- シンボリックリンクをたどった実際の場所が、プロジェクト（`website`）の中にあるフォルダならすべてエラー（非公開の内容を公開リポジトリに入れないため）
 
 ## site.json
 
@@ -55,16 +52,16 @@ content-sample/
 | `instagram` | フッター、ページ本文の `[INSTAGRAM_URL]` | 同上 |
 | `blog` | フッター、ページ本文の `[BLOG_URL]` | 同上 |
 | `map` | 地図の下の「Google マップで開く」 | リンクを出さない |
-| `mapEmbed` | 地図の埋め込み（`<iframe>`） | 「地図（見本）」の枠を出す |
+| `mapEmbed` | 地図の埋め込み（`<iframe>`） | 地図の埋め込みを出さない |
 
-`storageKeyPrefix` からできる保存先のキー名（例：`nishio-piano-sample` のとき）：
+`storageKeyPrefix` からできる保存先のキー名（例：`nishio-piano` のとき）：
 
 | キー名 | 保存する内容 |
 | --- | --- |
-| `nishio-piano-sample-availability-v1` | 空き状況 |
-| `nishio-piano-sample-events-v1` | 追加したイベント |
-| `nishio-piano-sample-home-photos-v1` | トップの写真の差し替え |
-| `nishio-piano-sample-event-photos-v1` | 既存イベントの本文と写真の変更 |
+| `nishio-piano-availability-v1` | 空き状況 |
+| `nishio-piano-events-v1` | 追加したイベント |
+| `nishio-piano-home-photos-v1` | トップの写真の差し替え |
+| `nishio-piano-event-photos-v1` | 既存イベントの本文と写真の変更 |
 
 ## data.json
 

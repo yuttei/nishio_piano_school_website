@@ -1,6 +1,6 @@
 // Node（ビルド・開発サーバー）とブラウザーの両方から使う、型と共通の定義です。
 // 教室ごとの文章や写真などのデータは、このファイルには持たせません。
-// 実際のデータは内容フォルダ（content-sample/ や非公開の website_content/）の
+// 実際のデータは非公開の内容フォルダ（既定は ../website_content）の
 // site.json と data.json に書き、parseSiteInfo・parseSiteData で形を確かめてから使います。
 
 export const DAYS = ["月", "火", "水", "木", "金", "土", "日"] as const
