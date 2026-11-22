@@ -1,17 +1,27 @@
 # にしおピアノ教室 Webサイト
 
-個人のピアノ教室「にしおピアノ教室」のWebサイトのコードです。レッスン内容・料金・空き状況・イベントを紹介する4ページ（ホーム・レッスン・イベント・無料体験）と、先生がスマートフォンから空き状況・イベント・写真を更新する編集画面の試作があります。
+個人のピアノ教室「にしおピアノ教室」の Web サイトのコードである。レッスン内容・料金・空き状況・イベントを紹介する公開 4 ページ（ホーム・レッスン・イベント・無料体験）と、スマートフォンから空き状況・イベント・写真を更新する自作管理画面（`/admin/`）、およびその後ろ側で動く Cloudflare Pages Functions を含む。
 
-サイトはHTML・CSS・TypeScriptと Vite で作り、ビルド時に各ページを静的なHTMLとして出力します。空き状況とイベントは、microCMS から取得することもできます。
+サイトは HTML・CSS・TypeScript と Vite で構築し、ビルド時に各ページを静的な HTML として出力する。公開ページは読み込み時に `/api/content` から最新の更新内容を取得して表示に反映し、通信失敗時や未更新時はビルド時の静的 HTML をそのまま表示する。ビルド時のデータ取得先として microCMS を併用することもできる。
 
-このリポジトリには、サイトのコード（骨組み・スタイル・スクリプト・編集画面の試作）だけが入っています。教室の文章・料金・写真などの実際の内容は非公開リポジトリ `website_content` に分けて管理しており、このリポジトリのコードと組み合わせて公開しています。
+このリポジトリにはサイトのコード（骨組み・スタイル・スクリプト・管理画面・Cloudflare Pages Functions）だけを入れている。教室の文章・料金・写真などの実際の内容は非公開リポジトリ `website_content` に分けて管理しており、ビルド時に組み合わせて公開している。
 
 - 公開中のサイト：<https://nishio-piano-school.pages.dev>
 - [内容フォルダの形式](docs/content-folder.md)
+- [管理画面と Cloudflare Pages Functions の設計](docs/admin-architecture.md)
 
-## 試作を開く
+## 管理画面でできる操作
 
-非公開リポジトリをこのディレクトリの兄弟フォルダ `../website_content` に置いたうえで、このディレクトリで次を実行します。初回は `nix develop path:.` で開発環境を準備します。
+- 空き状況の更新（曜日・時間帯ごとの選択と更新日時の自動記録）
+- イベントの追加・編集・削除
+- イベントの表示順の並び替え
+- トップページ 3 枠（ピアノ写真・教室紹介写真・イベント紹介写真）およびイベント写真の差し替え
+
+本番環境では `/admin/` と `/api/admin/*` を Cloudflare Access で保護し、公開 4 ページのフッターには `/admin/` へのリンクを出力しない。
+
+## ローカル開発（Vite 開発サーバー）
+
+非公開リポジトリをこのディレクトリの兄弟フォルダ `../website_content` に置いたうえで、このディレクトリで次を実行する。初回は `nix develop path:.` で開発環境を準備する。
 
 ```sh
 nix develop path:.
@@ -20,37 +30,57 @@ npm run dev -- --host 127.0.0.1 --port 4173
 ```
 
 - [教室サイト](http://127.0.0.1:4173/)
-- [空き状況・イベントの編集画面](http://127.0.0.1:4173/admin/)
+- [管理画面](http://127.0.0.1:4173/admin/)
 
-`npm run dev` は既定で兄弟フォルダ `../website_content` を使います。別の場所に置いた場合は、環境変数 `SITE_CONTENT_DIR` で内容フォルダを指定します。内容フォルダは、このリポジトリの外に置いてください（中に置くとエラーになります）。
+`npm run dev` は既定で兄弟フォルダ `../website_content` を使う。別の場所に置いた場合は、環境変数 `SITE_CONTENT_DIR` で内容フォルダを指定する。内容フォルダはこのリポジトリの外に置く（中に置くとエラーになる）。
 
-編集画面で保存した内容は、同じブラウザーのトップ・レッスン・イベントページで確認できます。「イベントの追加・編集」では、新しいイベントの登録と、掲載済みのイベントの見出し、開催年月、紹介文、写真、写真の説明（代替テキスト）の変更ができます。「写真の差し替え」では、トップのピアノ、教室紹介、イベント紹介の写真と、既存イベントの写真を選んで変更できます。データの保存先はそのブラウザーです。
+`npm run dev` 中の管理画面はブラウザー内の `localStorage` に保存する開発モードで動き、同じブラウザーのトップ・レッスン・イベントページで変更結果をすぐ確認できる。
 
-## ビルドとmicroCMS
+## Pages Functions 込みのローカル確認
 
-兄弟フォルダ `../website_content`（別の場所なら `SITE_CONTENT_DIR` で指定したフォルダ）を用意し、開発環境で `npm run build` を実行すると、型チェック後に4ページを `dist/` へ出力します。試作の編集画面は開発サーバーで利用します。
+ビルド後の静的ファイルと Cloudflare Pages Functions（Workers KV・R2・認証ミドルウェア）をまとめて手元で動作確認するには、次を実行する。
 
-microCMSを接続する場合は、ビルド環境に `MICROCMS_SERVICE_DOMAIN` と `MICROCMS_API_KEY` を設定します。APIキーはデータ取得用として設定し、内容は公開用のHTMLに出力しません。未設定時のビルドは、内容フォルダの `data.json` の空き状況とイベントを使用します。
+```sh
+npm run build && npm run dev:pages
+```
+
+`npm run dev:pages` はローカル用の KV（`SITE_KV`）・R2（`SITE_PHOTOS`）と `ALLOW_LOCAL_ADMIN_BYPASS=true` を付けて `wrangler pages dev dist` を起動する。ローカルバイパスは `localhost` と `127.0.0.1` でのみ有効であり、認証設定が未完了の本番環境では管理 API が `503` で停止する。
+
+## ビルドとデプロイ
+
+兄弟フォルダ `../website_content`（別の場所なら `SITE_CONTENT_DIR` で指定したフォルダ）を用意して `npm run build` を実行すると、フロントエンドと Functions の型チェック（`npm run check`）後に公開 4 ページと管理画面を `dist/` へ出力する。
+
+Cloudflare Pages へのデプロイは次を実行する。本番の KV Namespace ID や R2 バケット設定、Cloudflare Access の環境変数は公開リポジトリに置かないため、`wrangler.toml` は作成せず Cloudflare ダッシュボード側で管理する。
+
+```sh
+npx wrangler pages deploy dist --project-name nishio-piano-school
+```
+
+必要なバインディングと環境変数の一覧は [管理画面と Cloudflare Pages Functions の設計](docs/admin-architecture.md) を参照すること。
+
+## ビルド時の microCMS 連携（任意）
+
+ビルド時の静的 HTML に microCMS のデータを取り込む場合は、ビルド環境に `MICROCMS_SERVICE_DOMAIN` と `MICROCMS_API_KEY` を設定する。API キーはデータ取得用として設定し、内容は公開用の HTML に出力しない。未設定時のビルドは内容フォルダの `data.json` を使用する。
 
 | API | 形式とフィールド |
 | --- | --- |
-| `availability` | オブジェクト形式。`mon_morning`、`mon_afternoon` のように、`mon` から `sun` の7曜日と `morning`・`afternoon` を組み合わせた14個の単一選択。選択肢は「余裕あり」「残りわずか」「空きなし」「休み」。`morning` は内容フォルダの `site.json` の `timeSlots` の1つ目、`afternoon` は2つ目の時間帯として表示します |
+| `availability` | オブジェクト形式。`mon_morning`、`mon_afternoon` のように、`mon` から `sun` の 7 曜日と `morning`・`afternoon` を組み合わせた 14 個の単一選択。選択肢は「余裕あり」「残りわずか」「空きなし」「休み」。`morning` は内容フォルダの `site.json` の `timeSlots` の 1 つ目、`afternoon` は 2 つ目の時間帯として表示 |
 | `events` | リスト形式。`title` はテキスト、`description` はテキストエリア。任意で `month`（`YYYY-MM` のテキスト）、`image`（画像）、`imageAlt`（代替テキスト） |
 | `site-photos` | トップの写真を更新する場合に使用するオブジェクト形式。`piano`、`stickers`、`recital` は画像。`piano_alt`、`stickers_alt`、`recital_alt` は各写真の代替テキスト |
 
-トップの写真もmicroCMSで管理する場合は、`site-photos` を作成して公開し、ビルド環境に `MICROCMS_HOME_PHOTOS_API=site-photos` を設定します。環境変数や個別の画像を省略した箇所には、内容フォルダの写真を使用します。既存イベントを編集するには、`events` で該当の記事を開き、変更した項目を保存して公開します。microCMSに切り替える際に現在のイベントを引き続き掲載する場合は、各イベントを `events` に登録してください。更新内容は次のビルドで表示に反映されます。
+トップの写真も microCMS で管理する場合は、`site-photos` を作成して公開し、ビルド環境に `MICROCMS_HOME_PHOTOS_API=site-photos` を設定する。環境変数や個別の画像を省略した箇所には、内容フォルダの写真を使用する。
 
-## 検査とCI
+## 検査と CI
 
-コミットの前には、pre-commit（`.githooks/pre-commit`）が次の2つを自動で検査します。
+コミットの前には、pre-commit（`.githooks/pre-commit`）が次の 2 つを自動で検査する。
 
-- 実際の内容（文章・リンク・写真）がコミットに混ざっていないか。内容フォルダがあるときだけ、`scripts/check-private-content.mjs` で調べます。内容フォルダの既定の場所は、メインの作業ツリーの兄弟フォルダ `website_content` です（git worktree からコミットしても同じ場所を使います）。`SITE_CONTENT_DIR` で変えることもできます
-- APIキーやパスワードなどが含まれていないか。gitleaks で調べます
+- 実際の内容（文章・リンク・写真）がコミットに混ざっていないかを、内容フォルダがあるときだけ `scripts/check-private-content.mjs` で確認（既定の場所はメイン作業ツリーの兄弟フォルダ `website_content`、`SITE_CONTENT_DIR` で変更可能）
+- API キーやパスワードなどが含まれていないかを `gitleaks` で確認
 
-mainへのプルリクエストでは、GitHub Actions（`.github/workflows/check.yml`）が次を確認します。
+`main` へのプルリクエストでは、GitHub Actions（`.github/workflows/check.yml`）が次を確認する。
 
-- 公開してよい画像（マスコットと SNS のアイコン）以外の画像が入っていないか
-- 制作計画案が入っていないか
-- TypeScript の型チェック（`npm run check`）が通るか
+- 公開してよい画像（マスコットと SNS のアイコン）以外の画像が入っていないこと
+- 制作計画案が入っていないこと
+- TypeScript の型チェック（`npm run check`：フロントエンドと Functions の両方）が通ること
 
-実際の内容と組み合わせたビルドと、このリポジトリのすべての履歴への混入の検査は、非公開リポジトリの CI が行います。
+実際の内容と組み合わせたビルドと、このリポジトリのすべての履歴への混入の検査は、非公開リポジトリの CI が行う。

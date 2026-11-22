@@ -1,6 +1,6 @@
 // ページの部品（ヘッダー、フッター、空き状況の表など）のHTMLを作ります。
 // 教室ごとの文章やリンクは、内容フォルダの site.json・data.json から引数で受け取ります。
-import { DAYS, type Availability, type HomePhotoDefault, type HomePhotoSlot, type PageMeta, type Photo, type SchoolEvent, type SiteInfo, type SiteLinks, type Status } from "./content.ts"
+import { DAYS, isContentImagePath, isUploadedPhotoPath, type Availability, type HomePhotoDefault, type HomePhotoSlot, type PageMeta, type Photo, type SchoolEvent, type SiteInfo, type SiteLinks, type Status } from "./content.ts"
 
 export const pages = {
   home: { path: "/", title: "ホーム" },
@@ -16,8 +16,8 @@ export function escapeHtml(value: string): string {
 }
 
 function isImageUrl(url: string): boolean {
-  // 編集画面が保存する画像と、公開用の画像URLだけを画像要素に渡します。
-  return /^\/images\/[a-z0-9.-]+$/i.test(url) || /^https:\/\//i.test(url) ||
+  // 編集画面が保存する画像（R2 配信パスや開発時の data URL）と、公開用の画像URLだけを画像要素に渡します。
+  return isContentImagePath(url) || isUploadedPhotoPath(url) || /^https:\/\//i.test(url) ||
     /^data:image\/(jpeg|png|webp);base64,[a-z0-9+/=]+$/i.test(url)
 }
 

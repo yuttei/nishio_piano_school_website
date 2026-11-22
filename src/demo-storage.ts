@@ -1,9 +1,19 @@
-// ブラウザー専用。試作の編集画面で変えた内容を、このブラウザーの localStorage に保存します。
-// 公開サイトのデータは変更しません。
+// ブラウザー専用。開発サーバー（npm run dev）で編集した内容を、このブラウザーの localStorage に保存します。
+// 公開サイト（Cloudflare KV / R2）のデータは変更しません。
 // 既定値（何も保存していないときの表示）は、内容フォルダの data.json を
-// 開発サーバーが仮想モジュール "virtual:site-content" として渡したものを使います。
+// Vite が仮想モジュール "virtual:site-content" として渡したものを使います。
 import siteContent from "virtual:site-content"
-import { DAYS, isContentImagePath, isStatus, type Availability, type HomePhotoSlot, type Photo, type SchoolEvent } from "./content.ts"
+import {
+  DAYS,
+  homePhotoSlots,
+  isContentImagePath,
+  isStatus,
+  isUploadedPhotoPath,
+  type Availability,
+  type HomePhotoSlot,
+  type Photo,
+  type SchoolEvent,
+} from "./content.ts"
 
 type EventDetails = Pick<SchoolEvent, "title" | "month" | "description">
 type EventEdit = Partial<EventDetails> & Partial<Photo>
@@ -13,10 +23,15 @@ const { site, data } = siteContent
 // 保存先のキー名は、内容フォルダごとに site.json の storageKeyPrefix で分けます。
 const availabilityKey = `${site.storageKeyPrefix}-availability-v1`
 const eventsKey = `${site.storageKeyPrefix}-events-v1`
+const eventListKey = `${site.storageKeyPrefix}-event-list-v1`
 const homePhotosKey = `${site.storageKeyPrefix}-home-photos-v1`
-// 写真の差し替えで使っていたキーに、イベント本文の変更も保存します。
+// 以前の試作版で使っていたキー（互換性のため読み取り時に参照します）。
 const eventEditsKey = `${site.storageKeyPrefix}-event-photos-v1`
-const demoPhotoDataUrl = /^data:image\/jpeg;base64,[a-z0-9+/=]+$/i
+const demoPhotoDataUrl = /^data:image\/(jpeg|png|webp);base64,[a-z0-9+/=]+$/i
+
+function isAllowedDemoImage(url: string): boolean {
+  return isContentImagePath(url) || isUploadedPhotoPath(url) || demoPhotoDataUrl.test(url)
+}
 
 function readStoredValue(key: string): unknown {
   try {
@@ -36,10 +51,13 @@ function isAvailability(value: unknown): value is Availability {
 }
 
 function isSchoolEvent(value: unknown): value is SchoolEvent {
-  if (!value || typeof value !== "object") return false
-  return ["id", "title", "month", "description", "image", "imageAlt"].every(
-    (field) => typeof (value as Record<string, unknown>)[field] === "string",
-  )
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false
+  const record = value as Record<string, unknown>
+  if (!["id", "title", "month", "description", "image", "imageAlt"].every((field) => typeof record[field] === "string")) {
+    return false
+  }
+  const image = record.image as string
+  return image === "" || isAllowedDemoImage(image)
 }
 
 export function readAvailability(): Availability {
@@ -51,35 +69,42 @@ export function saveAvailability(availability: Availability): void {
   localStorage.setItem(availabilityKey, JSON.stringify(availability))
 }
 
-export function readAddedEvents(): SchoolEvent[] {
+function readAddedEvents(): SchoolEvent[] {
   const value = readStoredValue(eventsKey)
   return Array.isArray(value) ? value.filter(isSchoolEvent) : []
 }
 
-export function saveAddedEvents(events: SchoolEvent[]): void {
-  localStorage.setItem(eventsKey, JSON.stringify(events))
-}
-
-function readSavedPhotos(key: string): Record<string, Photo> {
+function readSavedPhotos(key: string): Partial<Record<HomePhotoSlot, Photo>> {
   const value = readStoredValue(key)
   if (!value || typeof value !== "object" || Array.isArray(value)) return {}
 
-  const photos = Object.entries(value).filter((entry): entry is [string, Photo] => {
-    const photo: unknown = entry[1]
-    return !!photo && typeof photo === "object" && "image" in photo && "imageAlt" in photo &&
-      typeof photo.image === "string" && demoPhotoDataUrl.test(photo.image) &&
-      typeof photo.imageAlt === "string"
-  })
-  return Object.fromEntries(photos)
+  const record = value as Record<string, unknown>
+  const photos: Partial<Record<HomePhotoSlot, Photo>> = {}
+  for (const slot of homePhotoSlots) {
+    const photo = record[slot]
+    if (!photo || typeof photo !== "object" || Array.isArray(photo)) continue
+    const item = photo as Record<string, unknown>
+    if (typeof item.image === "string" && isAllowedDemoImage(item.image) && typeof item.imageAlt === "string") {
+      photos[slot] = { image: item.image, imageAlt: item.imageAlt }
+    }
+  }
+  return photos
 }
 
 export function readDemoHomePhotos(): Record<HomePhotoSlot, Photo> {
   const saved = readSavedPhotos(homePhotosKey)
-  return { ...data.homePhotos, ...saved }
+  const result = {} as Record<HomePhotoSlot, Photo>
+  for (const slot of homePhotoSlots) {
+    result[slot] = saved[slot] ?? {
+      image: data.homePhotos[slot].image,
+      imageAlt: data.homePhotos[slot].imageAlt,
+    }
+  }
+  return result
 }
 
-export function saveDemoHomePhoto(slot: HomePhotoSlot, photo: Photo): void {
-  localStorage.setItem(homePhotosKey, JSON.stringify({ ...readSavedPhotos(homePhotosKey), [slot]: photo }))
+export function saveDemoHomePhotos(homePhotos: Record<HomePhotoSlot, Photo>): void {
+  localStorage.setItem(homePhotosKey, JSON.stringify(homePhotos))
 }
 
 function readSavedEventEdits(): Map<string, EventEdit> {
@@ -94,7 +119,7 @@ function readSavedEventEdits(): Map<string, EventEdit> {
     if (typeof title === "string" && typeof month === "string" && typeof description === "string") {
       Object.assign(edit, { title, month, description })
     }
-    if (typeof image === "string" && (isContentImagePath(image) || demoPhotoDataUrl.test(image))) {
+    if (typeof image === "string" && isAllowedDemoImage(image)) {
       edit.image = image
     }
     if (typeof imageAlt === "string") edit.imageAlt = imageAlt
@@ -104,21 +129,17 @@ function readSavedEventEdits(): Map<string, EventEdit> {
 }
 
 export function readDemoEvents(): SchoolEvent[] {
+  // 並び替えや削除を含む完全なイベント一覧が保存されていれば、それをそのまま使います。
+  const savedList = readStoredValue(eventListKey)
+  if (Array.isArray(savedList) && savedList.every(isSchoolEvent)) {
+    return savedList.map((event) => ({ ...event }))
+  }
+
   const edits = readSavedEventEdits()
   return [...readAddedEvents(), ...data.events].map((event) => ({ ...event, ...edits.get(event.id) }))
 }
 
-function saveDemoEventChanges(id: string, changes: EventEdit): void {
-  const edits = readSavedEventEdits()
-  // 変更した項目だけを上書きして、先に保存された本文や写真を残します。
-  edits.set(id, { ...edits.get(id), ...changes })
-  localStorage.setItem(eventEditsKey, JSON.stringify(Object.fromEntries(edits)))
-}
-
-export function saveDemoEventEdit(id: string, details: EventDetails, photo?: Photo | Pick<Photo, "imageAlt">): void {
-  saveDemoEventChanges(id, { ...details, ...photo })
-}
-
-export function saveDemoEventPhoto(id: string, photo: Photo): void {
-  saveDemoEventChanges(id, photo)
+// 追加・編集・並び替え・削除の結果をまとめて localStorage に保存します。
+export function saveDemoEvents(events: SchoolEvent[]): void {
+  localStorage.setItem(eventListKey, JSON.stringify(events))
 }
