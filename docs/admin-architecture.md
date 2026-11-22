@@ -50,7 +50,7 @@
 ### Cloudflare Access と JWT 署名検証
 
 - `CF_ACCESS_TEAM_DOMAIN` と `CF_ACCESS_AUD` が設定されている場合、`cf-access-jwt-assertion` リクエストヘッダーを必須とし、未付与なら `401` を返却
-- `CF_ACCESS_TEAM_DOMAIN` は末尾の `/` を除いたうえで `https://` で始まることを検証し、不正なら `503` を返却
+- `CF_ACCESS_TEAM_DOMAIN` は末尾の `/` を除いたうえで `new URL(...)` で構文と `protocol === "https:"` を検証し、不正なら `503` を返却
 - ライブラリ `jose` の `createRemoteJWKSet` で `${teamDomain}/cdn-cgi/access/certs` から公開鍵セットを取得し、`teamDomain` ごとにモジュール内でキャッシュ
 - `jwtVerify` により署名・発行者（`issuer`）・対象（`audience`）・有効期限を検証し、失敗時は `403` を返却
 
@@ -63,7 +63,7 @@
 ### CSRF 対策
 
 - `GET`・`HEAD`・`OPTIONS` 以外のメソッドで、`Origin` ヘッダーが存在する場合はリクエスト URL のオリジン（`new URL(request.url).origin`）との完全一致を検証し、不一致なら `403` を返却
-- `Sec-Fetch-Site` ヘッダーが `cross-site` の場合は `403` を返却
+- `Sec-Fetch-Site` ヘッダーが存在する場合は `same-origin` 以外を `403` で拒否
 
 ### 画像アップロードと配信の安全性
 
@@ -87,8 +87,9 @@
 
 - 管理画面は選択された画像をアップロード前にブラウザーの `<canvas>` で長辺最大 1200 ピクセルへ縮小し、品質 `0.82` の JPEG（`canvas.toBlob`）に変換して送信
 - API 側の上限サイズは 1 ファイルあたり 2MB（2,097,152 バイト）
-- `PUT /api/admin/events` と `PUT /api/admin/home-photos` は、保存前に旧データから `/api/photos/<key>` 形式のキーを収集
-- 新データの KV 保存後、`events:v1` と `home-photos:v1` のどちらからも参照されなくなったキーだけを `SITE_PHOTOS.delete(key)` で削除
+- `PUT /api/admin/events` と `PUT /api/admin/home-photos` は、旧データにあって今回保存する新データに含まれない `/api/photos/<key>` 形式のキーだけを差分として抽出
+- 新データの KV 保存後、更新した側は今回保存した確定データ、反対側は KV から取得した参照一覧を用いて使用中キーを判定し、どちらからも参照されなくなったキーだけを `SITE_PHOTOS.delete(key)` で削除
+- 反対側の KV に値が存在するにもかかわらず読み取りや形式検証に失敗した場合は、誤削除を防ぐため R2 の削除を実行せず安全に終了
 - 不要画像の削除に失敗しても、KV への本体保存が成功していればリクエスト自体は正常終了として返却
 
 ## バインディングと環境変数

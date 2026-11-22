@@ -1,8 +1,8 @@
 // トップページの3枠の写真を KV に保存する管理 API（PUT /api/admin/home-photos）です。
-import { homePhotoSlots, parseHomePhotosPayload, type HomePhotoSlot, type Photo } from "../../../src/content.ts"
+import { parseHomePhotosPayload, type HomePhotoSlot, type Photo } from "../../../src/content.ts"
 import {
   cleanupUnusedPhotos,
-  extractUploadedPhotoKey,
+  collectHomePhotoKeys,
   HOME_PHOTOS_KEY,
   jsonResponse,
   readDynamicContent,
@@ -20,20 +20,19 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
     return jsonResponse({ error: message }, 400)
   }
 
-  // 差し替え前のトップ写真で使っていたアップロード写真のキーを集め、不要になったものを後片付けします。
+  // 旧データにあって今回保存する新データには含まれないアップロード写真キーだけを、削除候補にします。
   const previous = await readDynamicContent(env)
+  const previousKeys = collectHomePhotoKeys(previous.homePhotos)
+  const nextKeys = collectHomePhotoKeys(homePhotos)
   const candidateKeys: string[] = []
-  if (previous.homePhotos) {
-    for (const slot of homePhotoSlots) {
-      const photo = previous.homePhotos[slot]
-      if (!photo) continue
-      const key = extractUploadedPhotoKey(photo.image)
-      if (key) candidateKeys.push(key)
+  for (const key of previousKeys) {
+    if (!nextKeys.has(key)) {
+      candidateKeys.push(key)
     }
   }
 
   await env.SITE_KV.put(HOME_PHOTOS_KEY, JSON.stringify(homePhotos))
-  await cleanupUnusedPhotos(env, candidateKeys)
+  await cleanupUnusedPhotos(env, candidateKeys, { kind: "homePhotos", homePhotos })
 
   return jsonResponse({ homePhotos })
 }

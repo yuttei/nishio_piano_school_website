@@ -102,6 +102,11 @@ async function requestAdminApi<T>(url: string, init: RequestInit): Promise<T> {
     throw new Error(formatApiError(response.status, serverMessage))
   }
 
+  // 200 OK でも Cloudflare Access のセッション切れ等で HTML が返った場合は、分かりやすい日本語エラーにします。
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    throw new Error("サーバーからの応答を読み取れませんでした。ページを再読み込みしてログインし直してください。")
+  }
+
   return body as T
 }
 

@@ -27,8 +27,8 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, next }) => {
       return jsonResponse({ error: "不正な送信元からのリクエストです。" }, 403)
     }
 
-    const secFetchSite = request.headers.get("sec-fetch-site")?.trim().toLowerCase()
-    if (secFetchSite === "cross-site") {
+    const secFetchSiteHeader = request.headers.get("sec-fetch-site")
+    if (secFetchSiteHeader !== null && secFetchSiteHeader.trim().toLowerCase() !== "same-origin") {
       return jsonResponse({ error: "外部サイトからの更新リクエストは許可されていません。" }, 403)
     }
   }
@@ -43,7 +43,13 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, next }) => {
     }
 
     const teamDomain = rawTeamDomain.replace(/\/+$/, "")
-    if (!teamDomain.startsWith("https://")) {
+    let parsedTeamDomain: URL
+    try {
+      parsedTeamDomain = new URL(teamDomain)
+    } catch {
+      return jsonResponse({ error: "管理画面の認証設定が正しくありません。" }, 503)
+    }
+    if (parsedTeamDomain.protocol !== "https:") {
       return jsonResponse({ error: "管理画面の認証設定が正しくありません。" }, 503)
     }
 

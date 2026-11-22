@@ -78,11 +78,23 @@ async function refreshLiveContent(): Promise<void> {
   }
 }
 
-void refreshLiveContent()
+// このページに動的差し替え対象（空き状況・イベント一覧・トップ写真）があるかどうかを調べます。
+// 無料体験ページなど差し替え対象がないページでは、不要な API 通信を省略します。
+function hasDynamicTarget(): boolean {
+  return Boolean(
+    document.getElementById("availability-content") ||
+      document.getElementById("event-content") ||
+      document.querySelector("[data-home-photo]"),
+  )
+}
 
-// ブラウザーの「戻る」操作でキャッシュ復元されたときも最新データを取り直します。
-window.addEventListener("pageshow", (event) => {
-  if (event.persisted) {
-    void refreshLiveContent()
-  }
-})
+if (hasDynamicTarget()) {
+  void refreshLiveContent()
+
+  // ブラウザーの「戻る」操作でキャッシュ復元されたときも最新データを取り直します。
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) {
+      void refreshLiveContent()
+    }
+  })
+}

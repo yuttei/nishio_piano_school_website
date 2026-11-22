@@ -277,8 +277,13 @@ function setupPhotoEditor(state: AdminSiteState, onEventsChanged: () => void): (
     const placeholder = new Option("差し替える場所を選択", "")
     placeholder.disabled = true
     targetInput.replaceChildren(placeholder, homeGroup, eventGroup)
-    targetInput.value = targets.has(selected) ? selected : ""
-    showCurrentPhoto(altInput.value === savedAlt)
+    const hasSelected = targets.has(selected)
+    targetInput.value = hasSelected ? selected : ""
+    if (!hasSelected && selected !== "") {
+      photoInput.value = ""
+      clearPreview()
+    }
+    showCurrentPhoto(!hasSelected || altInput.value === savedAlt)
   }
 
   refreshTargets()
@@ -421,6 +426,8 @@ function setupEventReorder(state: AdminSiteState, onOrderSaved: () => void): () 
   const syncFromState = (): void => {
     draftIds = state.events.map((event) => event.id)
     renderList()
+    // 別パネルでの保存によって並び順が再同期されたときは、古い未保存メッセージを残さないようにします。
+    showResult(result, "")
   }
 
   syncFromState()

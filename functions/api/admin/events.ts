@@ -2,8 +2,8 @@
 import { parseEventsPayload, type SchoolEvent } from "../../../src/content.ts"
 import {
   cleanupUnusedPhotos,
+  collectEventPhotoKeys,
   EVENTS_KEY,
-  extractUploadedPhotoKey,
   jsonResponse,
   readDynamicContent,
   readJsonBody,
@@ -20,16 +20,19 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
     return jsonResponse({ error: message }, 400)
   }
 
-  // 保存前のイベントで使っていたアップロード写真のキーを集め、不要になったものを後片付けします。
+  // 旧データにあって今回保存する新データには含まれないアップロード写真キーだけを、削除候補にします。
   const previous = await readDynamicContent(env)
+  const previousKeys = collectEventPhotoKeys(previous.events ?? [])
+  const nextKeys = collectEventPhotoKeys(events)
   const candidateKeys: string[] = []
-  for (const event of previous.events ?? []) {
-    const key = extractUploadedPhotoKey(event.image)
-    if (key) candidateKeys.push(key)
+  for (const key of previousKeys) {
+    if (!nextKeys.has(key)) {
+      candidateKeys.push(key)
+    }
   }
 
   await env.SITE_KV.put(EVENTS_KEY, JSON.stringify(events))
-  await cleanupUnusedPhotos(env, candidateKeys)
+  await cleanupUnusedPhotos(env, candidateKeys, { kind: "events", events })
 
   return jsonResponse({ events })
 }

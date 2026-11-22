@@ -10,6 +10,7 @@ import {
   type DynamicSiteContent,
   type HomePhotoSlot,
   type Photo,
+  type SchoolEvent,
 } from "../../src/content.ts"
 
 // Cloudflare ダッシュボード（Pages の設定）で紐づけるバインディングと環境変数です。
@@ -28,6 +29,12 @@ export const HOME_PHOTOS_KEY = "home-photos:v1"
 
 // /api/photos/<key> の <key> 部分に使える形式です（UUID と拡張子）。
 export const PHOTO_KEY_PATTERN = /^[a-z0-9-]+\.(jpg|webp|png)$/
+
+// 今回保存した確定データ（イベント一覧またはトップ写真）を表す型です。
+// 不要画像の削除時に、更新した側を KV から再読み取りせず確定データで参照判定するために使います。
+export type UpdatedPhotoReferences =
+  | { kind: "events"; events: readonly SchoolEvent[] }
+  | { kind: "homePhotos"; homePhotos: Record<HomePhotoSlot, Photo> }
 
 // JSON レスポンスを共通のヘッダー付きで返します。
 // 最新の状態をすぐ反映するため、キャッシュしない設定（no-store）を付けます。
@@ -60,6 +67,29 @@ export async function readJsonBody(request: Request): Promise<Record<string, unk
 export function extractUploadedPhotoKey(url: string): string | null {
   if (!isUploadedPhotoPath(url)) return null
   return url.slice("/api/photos/".length)
+}
+
+// イベント一覧から参照されている R2 写真キーの集合を集めます。
+export function collectEventPhotoKeys(events: readonly SchoolEvent[]): Set<string> {
+  const keys = new Set<string>()
+  for (const event of events) {
+    const key = extractUploadedPhotoKey(event.image)
+    if (key) keys.add(key)
+  }
+  return keys
+}
+
+// トップ写真データから参照されている R2 写真キーの集合を集めます。
+export function collectHomePhotoKeys(homePhotos: Partial<Record<HomePhotoSlot, Photo>> | null | undefined): Set<string> {
+  const keys = new Set<string>()
+  if (!homePhotos) return keys
+  for (const slot of homePhotoSlots) {
+    const photo = homePhotos[slot]
+    if (!photo) continue
+    const key = extractUploadedPhotoKey(photo.image)
+    if (key) keys.add(key)
+  }
+  return keys
 }
 
 function parseStoredAvailability(raw: string | null): Availability | null {
@@ -116,6 +146,42 @@ function parseStoredHomePhotos(raw: string | null): Partial<Record<HomePhotoSlot
   }
 }
 
+// クリーンアップ用に、反対側のトップ写真 KV から参照キーを厳密に読み取ります。
+// 未保存（null）なら空集合、値があるのに壊れている・型不正な場合は誤削除防止のため null を返します。
+function parseHomePhotosForCleanup(raw: string | null): Set<string> | null {
+  if (raw === null) return new Set<string>()
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null
+    const record = parsed as Record<string, unknown>
+    const keys = new Set<string>()
+
+    for (const [slot, entry] of Object.entries(record)) {
+      if (!homePhotoSlots.includes(slot as HomePhotoSlot)) return null
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null
+      const photo = entry as Record<string, unknown>
+      if (typeof photo.image !== "string" || typeof photo.imageAlt !== "string") return null
+      const image = photo.image.trim()
+      if (!isManagedImagePath(image)) return null
+      const key = extractUploadedPhotoKey(image)
+      if (key) keys.add(key)
+    }
+
+    return keys
+  } catch {
+    return null
+  }
+}
+
+// クリーンアップ用に、反対側のイベント KV から参照キーを厳密に読み取ります。
+// 未保存（null）なら空集合、値があるのに壊れている・型不正な場合は誤削除防止のため null を返します。
+function parseEventsForCleanup(raw: string | null): Set<string> | null {
+  if (raw === null) return new Set<string>()
+  const parsed = parseStoredEvents(raw)
+  if (parsed === null) return null
+  return collectEventPhotoKeys(parsed)
+}
+
 // KV から空き状況・イベント・トップ写真の3つを並列で取得します。
 // まだ保存されていない項目や壊れたデータは、画面が落ちないよう安全に null 扱いにします。
 export async function readDynamicContent(env: Env): Promise<DynamicSiteContent> {
@@ -133,8 +199,13 @@ export async function readDynamicContent(env: Env): Promise<DynamicSiteContent> 
 }
 
 // 差し替えや削除で不要になった R2 の写真を後片付けします。
-// 現在の KV（イベント一覧・トップ写真）のどちらからも使われていないキーだけを削除します。
-export async function cleanupUnusedPhotos(env: Env, candidateKeys: Iterable<string>): Promise<void> {
+// - 更新した側の使用中キーは、KV の結果整合性の影響を受けないよう今回保存した確定データから算出します。
+// - 反対側の KV は読み取り・検証に失敗した場合、誤削除を防ぐため何も削除せず安全に終了します。
+export async function cleanupUnusedPhotos(
+  env: Env,
+  candidateKeys: Iterable<string>,
+  updated: UpdatedPhotoReferences,
+): Promise<void> {
   const uniqueCandidates = new Set<string>()
   for (const key of candidateKeys) {
     if (PHOTO_KEY_PATTERN.test(key)) {
@@ -143,35 +214,29 @@ export async function cleanupUnusedPhotos(env: Env, candidateKeys: Iterable<stri
   }
   if (uniqueCandidates.size === 0) return
 
-  let eventsRaw: string | null
-  let homePhotosRaw: string | null
+  const referencedKeys = updated.kind === "events"
+    ? collectEventPhotoKeys(updated.events)
+    : collectHomePhotoKeys(updated.homePhotos)
+
+  let otherKeys: Set<string> | null
   try {
-    ;[eventsRaw, homePhotosRaw] = await Promise.all([
-      env.SITE_KV.get(EVENTS_KEY),
-      env.SITE_KV.get(HOME_PHOTOS_KEY),
-    ])
+    if (updated.kind === "events") {
+      const homePhotosRaw = await env.SITE_KV.get(HOME_PHOTOS_KEY)
+      otherKeys = parseHomePhotosForCleanup(homePhotosRaw)
+    } else {
+      const eventsRaw = await env.SITE_KV.get(EVENTS_KEY)
+      otherKeys = parseEventsForCleanup(eventsRaw)
+    }
   } catch {
-    // 現在の参照先を確認できないときは、誤削除を防ぐため何も消さずに終了します。
+    // 反対側の参照先を確認できないときは、誤削除を防ぐため何も消さずに終了します。
     return
   }
 
-  const referencedKeys = new Set<string>()
-  const events = parseStoredEvents(eventsRaw)
-  if (events) {
-    for (const event of events) {
-      const key = extractUploadedPhotoKey(event.image)
-      if (key) referencedKeys.add(key)
-    }
-  }
+  // 反対側の KV に値が存在するにもかかわらずパース・検証に失敗した場合は、誤削除防止のため中止します。
+  if (otherKeys === null) return
 
-  const homePhotos = parseStoredHomePhotos(homePhotosRaw)
-  if (homePhotos) {
-    for (const slot of homePhotoSlots) {
-      const photo = homePhotos[slot]
-      if (!photo) continue
-      const key = extractUploadedPhotoKey(photo.image)
-      if (key) referencedKeys.add(key)
-    }
+  for (const key of otherKeys) {
+    referencedKeys.add(key)
   }
 
   for (const key of uniqueCandidates) {
