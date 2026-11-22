@@ -1,4 +1,4 @@
-# main への Pull Request ごとに、型チェックとビルドが通るか確認します。
+# main への Pull Request ごとに、公開リポジトリの検査と型チェックが通るか確認します。
 name: check
 
 on:
@@ -11,8 +11,8 @@ permissions:
   contents: read
 
 jobs:
-  build:
-    name: 型チェックとビルド
+  check:
+    name: 型チェック
     runs-on: ubuntu-latest
     steps:
       - name: リポジトリを取得する
@@ -49,7 +49,7 @@ jobs:
       - name: 依存パッケージを入れる
         run: npm ci
 
-      # build は型チェック（tsc --noEmit）も含みます。
-      # microCMS の環境変数も内容フォルダも指定しないため、見本の内容（content-sample）でビルドします。
-      - name: 型チェックとビルドを行う
-        run: npm run build
+      # TypeScript の型チェック（tsc --noEmit）を行います。
+      # 実際の内容と組み合わせたビルドは、非公開リポジトリの CI で行います。
+      - name: 型チェックを行う
+        run: npm run check

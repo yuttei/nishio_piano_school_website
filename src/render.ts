@@ -51,7 +51,7 @@ export function renderPageMeta(meta: PageMeta): string {
   <title>${escapeHtml(meta.title)}</title>`
 }
 
-// notice が空でなければ、ヘッダーの上にお知らせの帯（見本であることの表示など）を出します。
+// notice が空でなければ、ヘッダーの上にお知らせの帯を出します。
 export function renderHeader(currentPage: string, notice: string): string {
   const navigation = Object.entries(pages).map(([id, page]) => {
     const current = currentPage === id ? ' aria-current="page"' : ""
@@ -77,12 +77,12 @@ export function renderSocialIcon(service: keyof typeof socialIcons): string {
   return `<img class="social-icon" src="/images/social/${socialIcons[service]}" width="24" height="24" alt="">`
 }
 
-// 地図です。埋め込み用のURLが空なら、地図の代わりに「地図（見本）」の枠を出します。
+// 地図です。埋め込み用のURLが空なら、地図の埋め込みを出しません。
 export function renderAccessMap(links: SiteLinks): string {
   const map = links.mapEmbed
     ? `<iframe class="access-map" title="Google マップで見るにしおピアノ教室" src="${escapeHtml(links.mapEmbed)}"
     width="600" height="280" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`
-    : '<div class="access-map access-map--placeholder" role="img" aria-label="地図（見本）">地図（見本）</div>'
+    : ""
   const open = links.map ? `
     <a class="text-link" href="${escapeHtml(links.map)}">Google マップで開く</a>` : ""
   return map + open

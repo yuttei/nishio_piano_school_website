@@ -49,7 +49,7 @@ export default defineConfig(({ command, mode }) => {
   const projectRoot = import.meta.dirname
   // process.env の値が .env ファイルより優先されます。
   const env = loadEnv(mode, projectRoot, ["MICROCMS_", "SITE_"])
-  // 内容フォルダの場所。既定は公開リポジトリに入っている見本（content-sample）です。
+  // 内容フォルダの場所。既定は兄弟フォルダ（../website_content）です。
   const contentDir = resolveContentDir(projectRoot, env.SITE_CONTENT_DIR)
 
   // 内容フォルダの読み込み結果を覚えておきます。開発中にファイルが変わったら消して読み直します。
