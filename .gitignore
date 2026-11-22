@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.DS_Store
+.env
+.env.*
+
+# 非公開の内容フォルダは、このリポジトリの外（兄弟フォルダの ../website_content）に置きます。
+# 誤ってこの中に置いたりコピーしたりしても追跡されないよう、よくある名前を除外します。
+# 公開してよい見本は content-sample/ だけです。
+/website_content/
+/content/
+/content-real/
+/private-content/

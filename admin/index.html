@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <title>教室ページの更新（試作） | にしおピアノ教室</title>
+    <link rel="icon" type="image/png" href="/images/school-mascot.png">
+    <link rel="stylesheet" href="/src/styles.css">
+    <link rel="stylesheet" href="/src/editor.css">
+    <script type="module" src="/src/editor.ts"></script>
+  </head>
+  <body class="editor-page">
+    <header class="editor-header">
+      <div class="wrap editor-header-inner">
+        <a class="brand" href="/">にしおピアノ教室</a>
+        <a class="editor-text-link" href="/">サイトのトップへ</a>
+      </div>
+    </header>
+    <main class="wrap editor-main">
+      <div class="editor-intro">
+        <h1>教室ページの更新</h1>
+        <p>スマートフォンでの操作を試す画面です。変更はこのブラウザーに保存されます。</p>
+        <div class="editor-actions">
+          <a class="editor-text-link" href="#edit-events">イベントを追加・編集する</a>
+          <a class="editor-text-link" href="#replace-photos">写真を差し替える</a>
+        </div>
+      </div>
+
+      <noscript>
+        <p>更新画面を使うには、ブラウザーでJavaScriptを有効にしてください。</p>
+      </noscript>
+
+      <div class="editor-panels">
+        <section class="editor-panel" aria-labelledby="availability-heading">
+          <h2 id="availability-heading">空き状況</h2>
+          <p class="editor-help">曜日と時間帯ごとに、現在の状態を選んでください。</p>
+          <form id="availability-editor">
+            <div id="availability-fields" class="editor-days"></div>
+            <div class="editor-actions">
+              <button class="btn btn-primary" type="submit">空き状況を保存</button>
+              <a class="editor-text-link" href="/lessons/#availability">空き状況を確認</a>
+            </div>
+            <p id="availability-status" class="editor-status" role="status"></p>
+          </form>
+        </section>
+
+        <section id="edit-events" class="editor-panel" aria-labelledby="event-heading">
+          <h2 id="event-heading">イベントの追加・編集</h2>
+          <form id="event-editor">
+            <div class="editor-field">
+              <label for="event-target">対象のイベント</label>
+              <select id="event-target" name="target"></select>
+            </div>
+            <div class="editor-field">
+              <label for="event-title">見出し</label>
+              <input id="event-title" name="title" type="text" required>
+            </div>
+            <div class="editor-field">
+              <label for="event-month">開催年月 <span class="editor-optional">任意</span></label>
+              <input id="event-month" name="month" type="month">
+            </div>
+            <div class="editor-field">
+              <label for="event-description">紹介文</label>
+              <textarea id="event-description" name="description" rows="4" required></textarea>
+            </div>
+            <div class="editor-field" id="event-current" hidden>
+              <p class="editor-photo-label">現在の写真</p>
+              <img id="event-current-photo" class="editor-photo-preview" alt="" hidden>
+              <p id="event-no-photo" class="editor-help" hidden>現在は写真がありません。</p>
+            </div>
+            <div class="editor-field">
+              <label for="event-photo">新しい写真 <span class="editor-optional">任意</span></label>
+              <input id="event-photo" name="photo" type="file" accept="image/*">
+              <img id="event-photo-preview" class="editor-photo-preview" alt="選択したイベント写真" hidden>
+            </div>
+            <div class="editor-field">
+              <label for="event-photo-alt">写真の説明（代替テキスト） <span class="editor-optional">任意</span></label>
+              <input id="event-photo-alt" name="imageAlt" type="text">
+            </div>
+            <div class="editor-actions">
+              <button class="btn btn-primary" type="submit">イベントを保存</button>
+              <a class="editor-text-link" href="/events/">イベントを確認</a>
+            </div>
+            <p id="event-status" class="editor-status" role="status"></p>
+          </form>
+        </section>
+
+        <section id="replace-photos" class="editor-panel editor-photo-panel" aria-labelledby="replacement-heading">
+          <h2 id="replacement-heading">写真の差し替え</h2>
+          <p class="editor-help">トップページの写真や、登録済みのイベント写真を変更できます。</p>
+          <form id="photo-editor">
+            <div class="editor-field">
+              <label for="replacement-target">差し替える場所</label>
+              <select id="replacement-target" name="target" required></select>
+            </div>
+            <div class="editor-field" id="replacement-current" hidden>
+              <p class="editor-photo-label">現在の写真</p>
+              <img id="replacement-current-photo" class="editor-photo-preview" alt="" hidden>
+              <p id="replacement-no-photo" class="editor-help" hidden>現在は写真がありません。</p>
+            </div>
+            <div class="editor-field">
+              <label for="replacement-photo">新しい写真</label>
+              <input id="replacement-photo" name="photo" type="file" accept="image/*" required>
+              <img id="replacement-photo-preview" class="editor-photo-preview" alt="選択した新しい写真" hidden>
+            </div>
+            <div class="editor-field">
+              <label for="replacement-alt">写真の説明（代替テキスト）</label>
+              <input id="replacement-alt" name="imageAlt" type="text" aria-describedby="replacement-alt-hint" required>
+              <p id="replacement-alt-hint" class="editor-help">写真の内容を短く入力してください。</p>
+            </div>
+            <div class="editor-actions">
+              <button class="btn btn-primary" type="submit">写真を差し替える</button>
+              <a id="replacement-review" class="editor-text-link" href="/" hidden></a>
+            </div>
+            <p id="replacement-status" class="editor-status" role="status"></p>
+          </form>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "name": "nishio-piano-school-website",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:real": "SITE_CONTENT_DIR=../website_content vite",
+    "check": "tsc --noEmit",
+    "build": "npm run check && vite build",
+    "build:real": "SITE_CONTENT_DIR=../website_content npm run build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.0"
+  }
+}

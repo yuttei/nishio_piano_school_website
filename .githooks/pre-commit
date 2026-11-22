@@ -1,0 +1,30 @@
+#!/bin/sh
+
+# 非公開の内容（教室の文章・リンク・写真など）がコミットに混ざっていないか確認します。
+# 内容フォルダの場所は SITE_CONTENT_DIR で変えられます。
+# 既定は、メインの作業ツリー（website）の兄弟フォルダ website_content です。
+# git worktree で作ったフォルダからコミットしても同じ場所を指すよう、
+# 作業ツリーごとに違うフォルダではなく、共通の .git フォルダの場所から数えます。
+git_common_dir=$(git rev-parse --path-format=absolute --git-common-dir) || exit 1
+main_root=$(dirname "$git_common_dir")
+# 表示が「website/../website_content」とならないよう、親フォルダの場所を先に求めます。
+parent_dir=$(cd "$main_root/.." && pwd) || exit 1
+content_dir="${SITE_CONTENT_DIR:-$parent_dir/website_content}"
+if [ -d "$content_dir" ]; then
+    if ! command -v node >/dev/null 2>&1; then
+        echo "node が見つかりません。website ディレクトリで nix develop path:. を実行してください。" >&2
+        exit 1
+    fi
+    node scripts/check-private-content.mjs "$content_dir" --staged || exit 1
+else
+    echo "内容フォルダ（$content_dir）が見つからないため、非公開の内容の確認を飛ばします。" >&2
+    echo "別の場所に置いている場合は、SITE_CONTENT_DIR に内容フォルダのパスを指定してください。" >&2
+fi
+
+# コミット対象に API キーやパスワードなどの機密情報が含まれていないか確認します。
+if ! command -v gitleaks >/dev/null 2>&1; then
+    echo "gitleaks が見つかりません。website ディレクトリで nix develop path:. を実行してください。" >&2
+    exit 1
+fi
+
+exec gitleaks git --pre-commit --staged --redact

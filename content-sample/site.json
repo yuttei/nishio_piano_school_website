@@ -1,0 +1,33 @@
+{
+  "formatVersion": 1,
+  "storageKeyPrefix": "nishio-piano-sample",
+  "notice": "このサイトは見本です。文章・料金・写真は架空のものです。",
+  "area": "〇〇県〇〇市（見本）",
+  "availabilityDemoNote": "見本の空き状況です。",
+  "timeSlots": ["午前（見本）", "午後（見本）"],
+  "links": {
+    "line": "https://example.com/line",
+    "instagram": "https://example.com/instagram",
+    "blog": "https://example.com/blog",
+    "map": "",
+    "mapEmbed": ""
+  },
+  "pages": {
+    "home": {
+      "title": "にしおピアノ教室（見本）",
+      "description": "にしおピアノ教室のサイトの見本です。個人レッスンの教室を想定した、架空の内容を掲載しています。"
+    },
+    "lessons": {
+      "title": "レッスン・料金（見本）｜にしおピアノ教室",
+      "description": "レッスン内容、コース料金と空き状況の見本ページです。料金は架空の値です。"
+    },
+    "events": {
+      "title": "イベント（見本）｜にしおピアノ教室",
+      "description": "発表会や季節の行事を紹介する見本ページです。写真と文章は架空のものです。"
+    },
+    "trial": {
+      "title": "無料体験・お問い合わせ（見本）｜にしおピアノ教室",
+      "description": "無料体験レッスンと見学の案内の見本ページです。"
+    }
+  }
+}

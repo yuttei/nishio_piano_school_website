@@ -1,0 +1,55 @@
+# main への Pull Request ごとに、型チェックとビルドが通るか確認します。
+name: check
+
+on:
+  pull_request:
+    branches:
+      - main
+
+# リポジトリの内容を読むだけなので、読み取り権限だけを与えます。
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: 型チェックとビルド
+    runs-on: ubuntu-latest
+    steps:
+      - name: リポジトリを取得する
+        uses: actions/checkout@v4
+
+      # 公開リポジトリに入れてよい画像は、マスコットと SNS のアイコンだけです。
+      # 教室の写真は非公開の内容フォルダ（website_content）に置きます。
+      - name: 公開してよい画像だけが入っているか確かめる
+        run: |
+          allowed="public/images/school-mascot.png
+          public/images/social/ameba.png
+          public/images/social/instagram.webp
+          public/images/social/line.png"
+          # 追跡中の画像ファイルのうち、上の一覧にないものを探します。
+          unexpected=$(git ls-files | grep -iE '\.(jpe?g|png|webp|gif|avif|heic)$' | grep -vxF "$allowed" || true)
+          if [ -n "$unexpected" ]; then
+            echo "公開リポジトリに入れてはいけない画像があります。写真は website_content の images/ に置いてください："
+            echo "$unexpected"
+            exit 1
+          fi
+
+      # 制作計画案は教室の内容を含むので、非公開の website_content/docs/ に置きます。
+      - name: 制作計画案が入っていないことを確かめる
+        run: test ! -e docs/site-renewal-plan.md
+
+      # npm のダウンロード結果をキャッシュして、次回以降を速くします。
+      - name: Node.js を準備する
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      # package-lock.json に書かれた版のとおりに依存パッケージを入れます。
+      - name: 依存パッケージを入れる
+        run: npm ci
+
+      # build は型チェック（tsc --noEmit）も含みます。
+      # microCMS の環境変数も内容フォルダも指定しないため、見本の内容（content-sample）でビルドします。
+      - name: 型チェックとビルドを行う
+        run: npm run build
