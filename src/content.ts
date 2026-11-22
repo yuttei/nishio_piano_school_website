@@ -82,6 +82,21 @@ export interface SiteContent {
   data: SiteData
 }
 
+// Cloudflare Pages Functions（KV）から公開ページ・管理画面へ渡す動的データです。
+// KV にまだ保存されていない項目は null になり、静的データ（data.json）の既定値を使います。
+export interface DynamicSiteContent {
+  availability: Availability | null
+  events: SchoolEvent[] | null
+  homePhotos: Partial<Record<HomePhotoSlot, Photo>> | null
+}
+
+// イベント一覧・各項目の入力上限です。フロントと API の両方で同じ値を使います。
+export const MAX_EVENTS_COUNT = 200
+export const MAX_EVENT_ID_LENGTH = 80
+export const MAX_EVENT_TITLE_LENGTH = 120
+export const MAX_EVENT_DESCRIPTION_LENGTH = 2000
+export const MAX_IMAGE_ALT_LENGTH = 200
+
 export function isStatus(value: unknown): value is Status {
   return STATUSES.some((status) => status === value)
 }
@@ -89,6 +104,16 @@ export function isStatus(value: unknown): value is Status {
 // 内容フォルダの images/ にある写真のパス（/images/名前）かどうかを調べます。
 export function isContentImagePath(value: string): boolean {
   return /^\/images\/[a-z0-9.-]+$/i.test(value)
+}
+
+// 管理画面から R2 にアップロードされた写真のパス（/api/photos/ID.拡張子）かどうかを調べます。
+export function isUploadedPhotoPath(value: string): boolean {
+  return /^\/api\/photos\/[a-z0-9-]+\.(jpg|webp|png)$/.test(value)
+}
+
+// サイトで管理している写真パス（内容フォルダの写真またはアップロード写真）かどうかを調べます。
+export function isManagedImagePath(value: string): boolean {
+  return isContentImagePath(value) || isUploadedPhotoPath(value)
 }
 
 // ここから下は、JSON の形を確かめる処理です。
@@ -229,4 +254,149 @@ export function parseSiteData(value: unknown, file: string, timeSlots: readonly 
     availability: { rows: rows as Status[][], updatedAt: updatedAt as string | null },
     events,
   }
+}
+
+// ここから下は、管理画面と Cloudflare Pages Functions で共有する入力チェックです。
+// 不正なデータが来たときは、原因が分かる日本語のエラーを投げます。
+
+// 空き状況の表（時間帯 × 7曜日）の配列を検証して返します。
+export function parseAvailabilityRows(value: unknown, expectedRows = 2): Status[][] {
+  if (!Array.isArray(value) || value.length !== expectedRows) {
+    throw new Error(`空き状況は時間帯の数（${expectedRows}行）の配列にしてください。`)
+  }
+
+  const parsedRows: Status[][] = []
+  for (let rowIndex = 0; rowIndex < value.length; rowIndex += 1) {
+    const row = value[rowIndex]
+    if (!Array.isArray(row) || row.length !== DAYS.length || !row.every(isStatus)) {
+      throw new Error(`空き状況の ${rowIndex + 1} 行目は、7曜日分の「${STATUSES.join("」「")}」のどれかにしてください。`)
+    }
+    parsedRows.push([...row])
+  }
+  return parsedRows
+}
+
+// イベント一覧の配列を検証して返します。
+export function parseEventsPayload(value: unknown): SchoolEvent[] {
+  if (!Array.isArray(value)) {
+    throw new Error("イベント一覧は配列にしてください。")
+  }
+  if (value.length > MAX_EVENTS_COUNT) {
+    throw new Error(`イベントは最大 ${MAX_EVENTS_COUNT} 件まで登録できます。`)
+  }
+
+  const ids = new Set<string>()
+  const parsedEvents: SchoolEvent[] = []
+
+  for (let index = 0; index < value.length; index += 1) {
+    const item = value[index]
+    const label = `${index + 1}件目のイベント`
+    if (!isObject(item)) {
+      throw new Error(`${label}はオブジェクトにしてください。`)
+    }
+
+    if (typeof item.id !== "string") {
+      throw new Error(`${label}のIDは文字列にしてください。`)
+    }
+    const id = item.id.trim()
+    if (!id) {
+      throw new Error(`${label}のIDを空にしないでください。`)
+    }
+    if (id.length > MAX_EVENT_ID_LENGTH) {
+      throw new Error(`${label}のIDは ${MAX_EVENT_ID_LENGTH} 文字以内にしてください。`)
+    }
+    if (ids.has(id)) {
+      throw new Error(`イベントID「${id}」が重複しています。`)
+    }
+    ids.add(id)
+
+    if (typeof item.title !== "string") {
+      throw new Error(`${label}の見出しは文字列にしてください。`)
+    }
+    const title = item.title.trim()
+    if (!title) {
+      throw new Error(`${label}の見出しを入力してください。`)
+    }
+    if (title.length > MAX_EVENT_TITLE_LENGTH) {
+      throw new Error(`${label}の見出しは ${MAX_EVENT_TITLE_LENGTH} 文字以内にしてください。`)
+    }
+
+    if (typeof item.month !== "string") {
+      throw new Error(`${label}の開催年月は文字列にしてください。`)
+    }
+    const month = item.month.trim()
+    if (month && !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
+      throw new Error(`${label}の開催年月は「2026-11」の形か、空文字にしてください。`)
+    }
+
+    if (typeof item.description !== "string") {
+      throw new Error(`${label}の紹介文は文字列にしてください。`)
+    }
+    const description = item.description.trim()
+    if (!description) {
+      throw new Error(`${label}の紹介文を入力してください。`)
+    }
+    if (description.length > MAX_EVENT_DESCRIPTION_LENGTH) {
+      throw new Error(`${label}の紹介文は ${MAX_EVENT_DESCRIPTION_LENGTH} 文字以内にしてください。`)
+    }
+
+    if (typeof item.image !== "string") {
+      throw new Error(`${label}の写真パスは文字列にしてください。`)
+    }
+    const image = item.image.trim()
+    if (image && !isManagedImagePath(image)) {
+      throw new Error(`${label}の写真パスが正しくありません。`)
+    }
+
+    if (typeof item.imageAlt !== "string") {
+      throw new Error(`${label}の写真の説明は文字列にしてください。`)
+    }
+    const imageAlt = item.imageAlt.trim()
+    if (imageAlt.length > MAX_IMAGE_ALT_LENGTH) {
+      throw new Error(`${label}の写真の説明は ${MAX_IMAGE_ALT_LENGTH} 文字以内にしてください。`)
+    }
+
+    parsedEvents.push({ id, title, month, description, image, imageAlt })
+  }
+
+  return parsedEvents
+}
+
+// トップページの3枠の写真（piano・stickers・recital）を検証して返します。
+export function parseHomePhotosPayload(value: unknown): Record<HomePhotoSlot, Photo> {
+  if (!isObject(value)) {
+    throw new Error("トップページの写真はオブジェクトにしてください。")
+  }
+
+  const parsed = {} as Record<HomePhotoSlot, Photo>
+  for (const slot of homePhotoSlots) {
+    const label = homePhotoLabels[slot]
+    const item = value[slot]
+    if (!isObject(item)) {
+      throw new Error(`${label}（${slot}）のデータがありません。`)
+    }
+
+    if (typeof item.image !== "string") {
+      throw new Error(`${label}の写真パスは文字列にしてください。`)
+    }
+    const image = item.image.trim()
+    if (!isManagedImagePath(image)) {
+      throw new Error(`${label}の写真パスが正しくありません。`)
+    }
+
+    if (typeof item.imageAlt !== "string") {
+      throw new Error(`${label}の写真の説明は文字列にしてください。`)
+    }
+    const imageAlt = item.imageAlt.trim()
+    if (!imageAlt) {
+      throw new Error(`${label}の写真の説明を入力してください。`)
+    }
+    if (imageAlt.length > MAX_IMAGE_ALT_LENGTH) {
+      throw new Error(`${label}の写真の説明は ${MAX_IMAGE_ALT_LENGTH} 文字以内にしてください。`)
+    }
+
+    parsed[slot] = { image, imageAlt }
+  }
+
+  return parsed
 }

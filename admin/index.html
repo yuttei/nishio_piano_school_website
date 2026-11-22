@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex">
-    <title>教室ページの更新（試作） | にしおピアノ教室</title>
+    <title>教室ページの更新 | にしおピアノ教室</title>
     <link rel="icon" type="image/png" href="/images/school-mascot.png">
     <link rel="stylesheet" href="/src/styles.css">
     <link rel="stylesheet" href="/src/editor.css">
@@ -20,18 +20,20 @@
     <main class="wrap editor-main">
       <div class="editor-intro">
         <h1>教室ページの更新</h1>
-        <p>スマートフォンでの操作を試す画面です。変更はこのブラウザーに保存されます。</p>
+        <p id="editor-mode-note">空き状況・イベント・写真を更新できます。</p>
         <div class="editor-actions">
-          <a class="editor-text-link" href="#edit-events">イベントを追加・編集する</a>
+          <a class="editor-text-link" href="#edit-events">イベントを追加・編集・削除する</a>
+          <a class="editor-text-link" href="#reorder-events">イベントを並び替える</a>
           <a class="editor-text-link" href="#replace-photos">写真を差し替える</a>
         </div>
+        <p id="editor-load-status" class="editor-status" role="status"></p>
       </div>
 
       <noscript>
         <p>更新画面を使うには、ブラウザーでJavaScriptを有効にしてください。</p>
       </noscript>
 
-      <div class="editor-panels">
+      <div id="editor-panels" class="editor-panels" hidden>
         <section class="editor-panel" aria-labelledby="availability-heading">
           <h2 id="availability-heading">空き状況</h2>
           <p class="editor-help">曜日と時間帯ごとに、現在の状態を選んでください。</p>
@@ -46,7 +48,7 @@
         </section>
 
         <section id="edit-events" class="editor-panel" aria-labelledby="event-heading">
-          <h2 id="event-heading">イベントの追加・編集</h2>
+          <h2 id="event-heading">イベントの追加・編集・削除</h2>
           <form id="event-editor">
             <div class="editor-field">
               <label for="event-target">対象のイベント</label>
@@ -54,7 +56,7 @@
             </div>
             <div class="editor-field">
               <label for="event-title">見出し</label>
-              <input id="event-title" name="title" type="text" required>
+              <input id="event-title" name="title" type="text" maxlength="120" required>
             </div>
             <div class="editor-field">
               <label for="event-month">開催年月 <span class="editor-optional">任意</span></label>
@@ -62,7 +64,7 @@
             </div>
             <div class="editor-field">
               <label for="event-description">紹介文</label>
-              <textarea id="event-description" name="description" rows="4" required></textarea>
+              <textarea id="event-description" name="description" rows="4" maxlength="2000" required></textarea>
             </div>
             <div class="editor-field" id="event-current" hidden>
               <p class="editor-photo-label">現在の写真</p>
@@ -76,14 +78,27 @@
             </div>
             <div class="editor-field">
               <label for="event-photo-alt">写真の説明（代替テキスト） <span class="editor-optional">任意</span></label>
-              <input id="event-photo-alt" name="imageAlt" type="text">
+              <input id="event-photo-alt" name="imageAlt" type="text" maxlength="200">
             </div>
             <div class="editor-actions">
               <button class="btn btn-primary" type="submit">イベントを保存</button>
+              <button id="event-delete" class="btn btn-danger" type="button" hidden>このイベントを削除</button>
               <a class="editor-text-link" href="/events/">イベントを確認</a>
             </div>
             <p id="event-status" class="editor-status" role="status"></p>
           </form>
+        </section>
+
+        <section id="reorder-events" class="editor-panel editor-reorder-panel" aria-labelledby="reorder-heading">
+          <h2 id="reorder-heading">イベントの並び替え</h2>
+          <p class="editor-help">「↑ 上へ」「↓ 下へ」で表示順を入れ替えて、「並び順を保存」を押してください。</p>
+          <ol id="event-order-list" class="editor-order-list"></ol>
+          <p id="event-order-empty" class="editor-help" hidden>並び替えできるイベントがありません。</p>
+          <div class="editor-actions">
+            <button id="event-order-save" class="btn btn-primary" type="button">並び順を保存</button>
+            <a class="editor-text-link" href="/events/">イベントを確認</a>
+          </div>
+          <p id="event-order-status" class="editor-status" role="status"></p>
         </section>
 
         <section id="replace-photos" class="editor-panel editor-photo-panel" aria-labelledby="replacement-heading">
@@ -106,7 +121,7 @@
             </div>
             <div class="editor-field">
               <label for="replacement-alt">写真の説明（代替テキスト）</label>
-              <input id="replacement-alt" name="imageAlt" type="text" aria-describedby="replacement-alt-hint" required>
+              <input id="replacement-alt" name="imageAlt" type="text" maxlength="200" aria-describedby="replacement-alt-hint" required>
               <p id="replacement-alt-hint" class="editor-help">写真の内容を短く入力してください。</p>
             </div>
             <div class="editor-actions">

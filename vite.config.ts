@@ -16,7 +16,8 @@ import {
   renderSocialIcon,
 } from "./src/render.ts"
 
-// 開発サーバーの中で使う仮想モジュールの名前です。ブラウザー側の demo-storage.ts などが import します。
+// ブラウザー側で使う仮想モジュールの名前です。
+// 開発サーバーではデモ編集画面・プレビュー、ビルドでは管理画面とライブ反映スクリプトが import します。
 const virtualModuleId = "virtual:site-content"
 const resolvedVirtualModuleId = "\0" + virtualModuleId
 
@@ -88,7 +89,7 @@ export default defineConfig(({ command, mode }) => {
       if (id === virtualModuleId) return resolvedVirtualModuleId
     },
     load(id) {
-      // 開発サーバーのブラウザー側（編集画面とプレビュー）だけが使います。
+      // ブラウザー側（管理画面・公開ページのライブ反映・開発時プレビュー）に既定値を渡します。
       if (id !== resolvedVirtualModuleId) return
       const { site, data } = getContentFiles()
       return `export default ${JSON.stringify({ site, data })}`
@@ -151,7 +152,12 @@ export default defineConfig(({ command, mode }) => {
           .replace("<!-- PAGE_META -->", () => renderPageMeta(site.pages[page]))
         // 3. 断片の中のリンクと、ページの部品
         pageHtml = fillLinkPlaceholders(pageHtml, site.links)
-          .replace("<!-- EDITOR_PREVIEW -->", isDemo ? '<script type="module" src="/src/demo.ts"></script>' : "")
+          .replace(
+            "<!-- EDITOR_PREVIEW -->",
+            isDemo
+              ? '<script type="module" src="/src/demo.ts"></script>'
+              : '<script type="module" src="/src/live-content.ts"></script>',
+          )
           .replaceAll("<!-- ACCESS_MAP -->", () => renderAccessMap(site.links))
           .replace("<!-- SITE_HEADER -->", () => renderHeader(page, site.notice))
           .replace("<!-- SITE_FOOTER -->", () => renderFooter(site, isDemo))
@@ -182,6 +188,7 @@ export default defineConfig(({ command, mode }) => {
           lessons: resolve(projectRoot, "lessons/index.html"),
           events: resolve(projectRoot, "events/index.html"),
           trial: resolve(projectRoot, "trial/index.html"),
+          admin: resolve(projectRoot, "admin/index.html"),
         },
       },
     },
