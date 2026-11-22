@@ -4,8 +4,9 @@
 
 サイトはHTML・CSS・TypeScriptと Vite で作り、ビルド時に各ページを静的なHTMLとして出力します。空き状況とイベントは、microCMS から取得することもできます。
 
-このリポジトリに入っている文章・料金・写真は、すべて架空の見本（`content-sample/`）です。教室の実際の内容は、非公開リポジトリ `website_content` に分けて管理しています。
+このリポジトリに入っている文章・料金・写真は、すべて架空の見本（`content-sample/`）です。教室の実際の内容は非公開リポジトリ `website_content` に分けて管理しており、このリポジトリのコードと組み合わせて公開しています。
 
+- 公開中のサイト（実際の内容）：<https://nishio-piano-school.pages.dev>
 - [内容フォルダの形式](docs/content-folder.md)
 
 ## 試作を開く
