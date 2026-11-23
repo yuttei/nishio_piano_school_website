@@ -55,6 +55,8 @@ export interface SiteLinks {
 export interface SiteInfo {
   formatVersion: 1
   storageKeyPrefix: string
+  // 公開サイトの基準 URL（例：https://example.com）。任意項目で、未設定時は空文字になります。
+  siteUrl: string
   notice: string
   area: string
   availabilityDemoNote: string
@@ -146,12 +148,54 @@ function readRequiredText(object: JsonObject, key: string, file: string, path: s
   return value
 }
 
+// siteUrl は任意項目です。未設定・空文字のときは "" を返し、
+// 値が指定されているときは https:// で始まるオリジン URL だけを許可して末尾の / を除いた形に整えます。
+function parseOptionalSiteUrl(value: unknown, file: string): string {
+  if (value === undefined) return ""
+  if (typeof value !== "string") {
+    fail(file, "siteUrl", "は文字列にしてください。")
+  }
+
+  const trimmed = value.trim()
+  if (!trimmed) return ""
+
+  let parsed: URL
+  try {
+    parsed = new URL(trimmed)
+  } catch {
+    fail(file, "siteUrl", "は https:// で始まる有効なURL（例：https://example.com）にしてください。")
+  }
+
+  // オリジン（https://ホスト名）だけを受け付け、ユーザー情報・パス・クエリ・ハッシュ付きは弾きます。
+  if (
+    parsed.protocol !== "https:" ||
+    parsed.username !== "" ||
+    parsed.password !== "" ||
+    parsed.pathname !== "/" ||
+    parsed.search !== "" ||
+    parsed.hash !== "" ||
+    trimmed.includes("?") ||
+    trimmed.includes("#")
+  ) {
+    fail(
+      file,
+      "siteUrl",
+      "は https:// で始まるオリジンURL（パス・クエリ・ハッシュなし、例：https://example.com）にしてください。",
+    )
+  }
+
+  // parsed.origin は末尾の / を含まない正規化された形（例：https://example.com）になります。
+  return parsed.origin
+}
+
 export function parseSiteInfo(value: unknown, file: string): SiteInfo {
   const site = readObject(value, file, "全体")
   if (site.formatVersion !== 1) fail(file, "formatVersion", "は 1 にしてください（この版のサイトが読める形式は 1 です）。")
 
   const storageKeyPrefix = readRequiredText(site, "storageKeyPrefix", file, "")
   if (!/^[a-z0-9-]+$/.test(storageKeyPrefix)) fail(file, "storageKeyPrefix", "は小文字の英字・数字・- だけにしてください。")
+
+  const siteUrl = parseOptionalSiteUrl(site.siteUrl, file)
 
   const timeSlots = site.timeSlots
   if (!Array.isArray(timeSlots) || timeSlots.length !== 2 || !timeSlots.every((slot) => typeof slot === "string" && slot.trim())) {
@@ -179,6 +223,7 @@ export function parseSiteInfo(value: unknown, file: string): SiteInfo {
   return {
     formatVersion: 1,
     storageKeyPrefix,
+    siteUrl,
     notice: readText(site, "notice", file, ""),
     area: readRequiredText(site, "area", file, ""),
     availabilityDemoNote: readText(site, "availabilityDemoNote", file, ""),

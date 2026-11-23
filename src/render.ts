@@ -1,8 +1,10 @@
 // ページの部品（ヘッダー、フッター、空き状況の表など）のHTMLを作ります。
 // 教室ごとの文章やリンクは、内容フォルダの site.json・data.json から引数で受け取ります。
-import { DAYS, isContentImagePath, isUploadedPhotoPath, type Availability, type HomePhotoDefault, type HomePhotoSlot, type PageMeta, type Photo, type SchoolEvent, type SiteInfo, type SiteLinks, type Status } from "./content.ts"
+import { DAYS, isContentImagePath, isUploadedPhotoPath, pageIds, type Availability, type HomePhotoDefault, type HomePhotoSlot, type PageId, type Photo, type SchoolEvent, type SiteInfo, type SiteLinks, type Status } from "./content.ts"
 
-export const pages = {
+const SITE_NAME = "にしおピアノ教室"
+
+export const pages: Record<PageId, { path: string; title: string }> = {
   home: { path: "/", title: "ホーム" },
   lessons: { path: "/lessons/", title: "レッスン" },
   events: { path: "/events/", title: "イベント" },
@@ -45,10 +47,108 @@ export function renderHomePhoto(slot: HomePhotoSlot, photo: Photo, fallback: Hom
   return `${image}<figcaption><span data-home-photo-caption="${slot}">${escapeHtml(caption)}</span>${decoration}</figcaption>`
 }
 
-// <head> に入れる説明文とページ名です。
-export function renderPageMeta(meta: PageMeta): string {
-  return `<meta name="description" content="${escapeHtml(meta.description)}">
-  <title>${escapeHtml(meta.title)}</title>`
+// OGP / Twitter Card 用の画像 URL を絶対 URL（https://...）に解決します。
+// data: URL や空文字など、SNS クローラーが取得できない値は空文字として無視します。
+function resolveOgImageUrl(siteUrl: string, ogImagePath?: string): string {
+  const trimmed = ogImagePath?.trim() ?? ""
+  if (!trimmed || /^data:/i.test(trimmed)) return ""
+  if (/^https:\/\//i.test(trimmed)) return trimmed
+  if (trimmed.startsWith("/") && !trimmed.startsWith("//")) {
+    return `${siteUrl}${trimmed}`
+  }
+  return ""
+}
+
+// <script type="application/ld+json"> の中に安全に埋め込めるよう、
+// HTML のタグ終了（</script>）や特殊文字になり得る記号を Unicode エスケープします。
+function serializeJsonLd(data: Record<string, unknown>): string {
+  return JSON.stringify(data)
+    .replaceAll("<", "\\u003c")
+    .replaceAll(">", "\\u003e")
+    .replaceAll("&", "\\u0026")
+    .replaceAll("\u2028", "\\u2028")
+    .replaceAll("\u2029", "\\u2029")
+}
+
+// <head> に入れる説明文・ページ名・SEO 用のメタタグ（canonical・OGP・Twitter Card・JSON-LD）を作ります。
+// site.siteUrl が空文字のときは、従来の <meta name="description"> と <title> だけを出力します。
+export function renderPageMeta(site: SiteInfo, page: PageId, ogImagePath?: string): string {
+  const meta = site.pages[page]
+  const lines = [
+    `<meta name="description" content="${escapeHtml(meta.description)}">`,
+    `<title>${escapeHtml(meta.title)}</title>`,
+  ]
+
+  if (!site.siteUrl) {
+    return lines.join("\n  ")
+  }
+
+  const pageUrl = `${site.siteUrl}${pages[page].path}`
+  const ogImageUrl = resolveOgImageUrl(site.siteUrl, ogImagePath)
+
+  lines.push(
+    `<link rel="canonical" href="${escapeHtml(pageUrl)}">`,
+    '<meta property="og:type" content="website">',
+    `<meta property="og:site_name" content="${escapeHtml(SITE_NAME)}">`,
+    '<meta property="og:locale" content="ja_JP">',
+    `<meta property="og:title" content="${escapeHtml(meta.title)}">`,
+    `<meta property="og:description" content="${escapeHtml(meta.description)}">`,
+    `<meta property="og:url" content="${escapeHtml(pageUrl)}">`,
+  )
+  if (ogImageUrl) {
+    lines.push(`<meta property="og:image" content="${escapeHtml(ogImageUrl)}">`)
+  }
+
+  lines.push(
+    `<meta name="twitter:card" content="${ogImageUrl ? "summary_large_image" : "summary"}">`,
+    `<meta name="twitter:title" content="${escapeHtml(meta.title)}">`,
+    `<meta name="twitter:description" content="${escapeHtml(meta.description)}">`,
+  )
+  if (ogImageUrl) {
+    lines.push(`<meta name="twitter:image" content="${escapeHtml(ogImageUrl)}">`)
+  }
+
+  // トップページのみ、検索エンジン向けに音楽教室の構造化データ（JSON-LD）を埋め込みます。
+  if (page === "home") {
+    const sameAs = [site.links.instagram, site.links.blog, site.links.line].filter(Boolean)
+    const structuredData: Record<string, unknown> = {
+      "@context": "https://schema.org",
+      "@type": "MusicSchool",
+      name: SITE_NAME,
+      url: `${site.siteUrl}/`,
+      description: meta.description,
+      ...(ogImageUrl ? { image: ogImageUrl } : {}),
+      areaServed: site.area,
+      ...(sameAs.length > 0 ? { sameAs } : {}),
+    }
+    lines.push(`<script type="application/ld+json">${serializeJsonLd(structuredData)}</script>`)
+  }
+
+  return lines.join("\n  ")
+}
+
+// 検索エンジンのクローラー向け設定ファイル（robots.txt）を作ります。
+// 管理画面と管理用 API をクロール対象から外し、公開基準 URL があればサイトマップの場所も案内します。
+export function renderRobotsTxt(siteUrl: string): string {
+  const lines = [
+    "User-agent: *",
+    "Allow: /",
+    "Disallow: /admin/",
+    "Disallow: /api/admin/",
+  ]
+  if (siteUrl) {
+    lines.push("", `Sitemap: ${siteUrl}/sitemap.xml`)
+  }
+  return `${lines.join("\n")}\n`
+}
+
+// 検索エンジン向けのサイトマップ（sitemap.xml）を作ります。
+// 公開 4 ページ（ホーム・レッスン・イベント・無料体験）だけを載せ、管理画面（/admin/）は含めません。
+export function renderSitemapXml(siteUrl: string): string {
+  const urls = pageIds.map(
+    (page) => `  <url>\n    <loc>${escapeHtml(`${siteUrl}${pages[page].path}`)}</loc>\n  </url>`,
+  )
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join("\n")}\n</urlset>\n`
 }
 
 // notice が空でなければ、ヘッダーの上にお知らせの帯を出します。

@@ -13,6 +13,8 @@ import {
   renderHeader,
   renderHomePhoto,
   renderPageMeta,
+  renderRobotsTxt,
+  renderSitemapXml,
   renderSocialIcon,
 } from "./src/render.ts"
 
@@ -136,11 +138,15 @@ export default defineConfig(({ command, mode }) => {
       return `export default ${JSON.stringify({ site, data })}`
     },
     buildStart() {
-      // ビルドでは、内容フォルダの写真を dist/images/ に書き出します（開発サーバーでは下の配信を使います）。
+      // ビルドでは、内容フォルダの写真と SEO 用ファイル（robots.txt・sitemap.xml）を dist/ に書き出します。
       if (command !== "build") return
-      const { imageNames } = getContentFiles()
+      const { site, imageNames } = getContentFiles()
       for (const name of imageNames) {
         this.emitFile({ type: "asset", fileName: `images/${name}`, source: readContentImage(contentDir, name).body })
+      }
+      this.emitFile({ type: "asset", fileName: "robots.txt", source: renderRobotsTxt(site.siteUrl) })
+      if (site.siteUrl) {
+        this.emitFile({ type: "asset", fileName: "sitemap.xml", source: renderSitemapXml(site.siteUrl) })
       }
     },
     configureServer(server) {
@@ -189,8 +195,8 @@ export default defineConfig(({ command, mode }) => {
         // 1. 本文を差し込みます。断片に $ が入っていても特別な置換にならないよう、関数で渡します。
         //    断片は自分の字下げと末尾の改行を持つので、目印の行（前の空白と改行を含む）ごと置き換えます。
         let pageHtml = html.replace(/^[ \t]*<!-- PAGE_MAIN -->[ \t]*\r?\n?/m, () => pageMain)
-          // 2. <title> と説明文
-          .replace("<!-- PAGE_META -->", () => renderPageMeta(site.pages[page]))
+          // 2. <title>・説明文・SEO 用のメタタグ（canonical・OGP・Twitter Card・JSON-LD）
+          .replace("<!-- PAGE_META -->", () => renderPageMeta(site, page, content.homePhotos.piano.image))
         // 3. 断片の中のリンクと、ページの部品
         pageHtml = fillLinkPlaceholders(pageHtml, site.links)
           .replace(
