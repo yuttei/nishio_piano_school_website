@@ -21,7 +21,42 @@ import {
 const virtualModuleId = "virtual:site-content"
 const resolvedVirtualModuleId = "\0" + virtualModuleId
 
+// 外部サイトへの <a> 開始タグに、新しいタブで開く設定（target="_blank"）と
+// セキュリティ対策（rel="noopener noreferrer"）を補います。
+// すでに target や rel が書かれている場合は、属性を重複させずに不足分だけを追加します。
+function ensureExternalLinkAttributes(openingTag: string): string {
+  // 末尾の ">" をいったん外して、必要な属性を後ろに足せるようにします。
+  let tag = openingTag.slice(0, -1).trimEnd()
+
+  // target 属性がまだ付いていない場合だけ、target="_blank" を追加します。
+  if (!/\starget\s*=/i.test(tag)) {
+    tag += ' target="_blank"'
+  }
+
+  // rel 属性がすでにある場合は、元の値を残しつつ noopener・noreferrer の足りない分だけ足します。
+  const relPattern = /(\s)rel\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i
+  if (relPattern.test(tag)) {
+    tag = tag.replace(
+      relPattern,
+      (_match, leadingSpace: string, doubleQuoted?: string, singleQuoted?: string, unquoted?: string) => {
+        const currentValue = doubleQuoted ?? singleQuoted ?? unquoted ?? ""
+        const tokens = currentValue.trim() ? currentValue.trim().split(/\s+/) : []
+        const lowerTokens = tokens.map((token) => token.toLowerCase())
+        if (!lowerTokens.includes("noopener")) tokens.push("noopener")
+        if (!lowerTokens.includes("noreferrer")) tokens.push("noreferrer")
+        return `${leadingSpace}rel="${tokens.join(" ")}"`
+      },
+    )
+  } else {
+    // rel 属性がない場合は、そのまま rel="noopener noreferrer" を追加します。
+    tag += ' rel="noopener noreferrer"'
+  }
+
+  return `${tag}>`
+}
+
 // ページの断片にある [LINE_URL] などの目印を、site.json のリンクに置き換えます。
+// 外部サイトへの <a> タグには、新しいタブで開く属性も自動で補います。
 // リンクが空文字のときは、その目印を使っている <a>…</a> をまるごと取り除きます。
 function fillLinkPlaceholders(html: string, links: SiteLinks): string {
   const placeholders = [
@@ -34,9 +69,15 @@ function fillLinkPlaceholders(html: string, links: SiteLinks): string {
     const marker = `[${name}_URL]`
     if (url) {
       // URL は属性値（href="…"）に入るので、" や & などを HTML 用に変換してから入れます。
-      result = result.replaceAll(marker, () => escapeHtml(url))
+      const escapedUrl = escapeHtml(url)
+      // まず href="[〇〇_URL]" を持つ <a> の開始タグを探し、新しいタブで開く属性を補ってから URL を差し込みます。
+      const openingTagPattern = new RegExp(`<a\\b[^>]*\\shref\\s*=\\s*(["'])\\[${name}_URL\\]\\1[^>]*>`, "g")
+      result = result.replace(openingTagPattern, (openingTag) =>
+        ensureExternalLinkAttributes(openingTag).replaceAll(marker, () => escapedUrl))
+      // <a> の href 以外の場所に目印が残っていれば、そのまま URL に置き換えます。
+      result = result.replaceAll(marker, () => escapedUrl)
     } else {
-      const linkPattern = new RegExp(`<a\\b[^>]*href="\\[${name}_URL\\]"[^>]*>[\\s\\S]*?</a>`, "g")
+      const linkPattern = new RegExp(`<a\\b[^>]*\\shref\\s*=\\s*(["'])\\[${name}_URL\\]\\1[^>]*>[\\s\\S]*?</a>`, "g")
       result = result.replace(linkPattern, "")
     }
   }

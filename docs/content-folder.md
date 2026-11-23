@@ -44,7 +44,7 @@ website_content/
 | `links` | オブジェクト | 外部サイトへのリンク（下の表） |
 | `pages` | オブジェクト | `home`・`lessons`・`events`・`trial` ごとの `title`（`<title>`）と `description`（`<meta name="description">`）。どちらも空にできない |
 
-`links` の各項目は、`https://` で始まる文字列か空文字にする。空文字の項目は表示しない。
+`links` の各項目は、`https://` で始まる文字列か空文字にする。空文字の項目は表示しない。外部サイトへのリンク（`line`・`instagram`・`blog`・`map`）は、フッター・地図・ページ本文のいずれでも新規タブで開くよう `target="_blank" rel="noopener noreferrer"` を付与する。
 
 | 項目 | 使う場所 | 空文字のとき |
 | --- | --- | --- |
@@ -121,6 +121,7 @@ website_content/
 | `[LINE_ICON]`・`[INSTAGRAM_ICON]`・`[BLOG_ICON]` | SNS のアイコン画像 | なし |
 
 - `id="availability-content"` と `id="event-content"` は、開発サーバーでのプレビュー反映（`src/demo.ts`）および本番ビルドでの公開ページ即時反映（`src/live-content.ts`）の両方で表示を書き換える対象として使う
+- `[LINE_URL]`・`[INSTAGRAM_URL]`・`[BLOG_URL]` を `href` に持つ `<a>` タグには、URL の置換時に `target="_blank"` と `rel="noopener noreferrer"` の不足分を自動で付与する
 - ビルドでは、置き換わらずに残った目印（`<!-- 大文字で始まる名前 -->` と `[〇〇_URL]`・`[〇〇_ICON]`）があるとエラー
 
 ## images/

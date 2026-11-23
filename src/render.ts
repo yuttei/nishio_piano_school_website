@@ -83,8 +83,9 @@ export function renderAccessMap(links: SiteLinks): string {
     ? `<iframe class="access-map" title="Google マップで見るにしおピアノ教室" src="${escapeHtml(links.mapEmbed)}"
     width="600" height="280" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`
     : ""
+  // Google マップは外部サイトなので、新しいタブで開く設定とセキュリティ対策（noopener noreferrer）を付けます。
   const open = links.map ? `
-    <a class="text-link" href="${escapeHtml(links.map)}">Google マップで開く</a>` : ""
+    <a class="text-link" href="${escapeHtml(links.map)}" target="_blank" rel="noopener noreferrer">Google マップで開く</a>` : ""
   return map + open
 }
 
@@ -96,8 +97,9 @@ export function renderFooter(site: SiteInfo, isDemo: boolean): string {
     { url: site.links.blog, service: "blog", label: "Amebaブログ" },
     { url: site.links.line, service: "line", label: "公式LINE" },
   ] as const
+  // SNS は外部サイトなので、新しいタブで開く設定とセキュリティ対策（noopener noreferrer）を付けます。
   const linkHtml = socialLinks.filter((link) => link.url).map((link) => `
-      <a class="social-link" href="${escapeHtml(link.url)}">${renderSocialIcon(link.service)}${link.label}</a>`).join("")
+      <a class="social-link" href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer">${renderSocialIcon(link.service)}${link.label}</a>`).join("")
   return `<footer class="site-footer"><div class="wrap footer-inner">
     <div><a class="brand" href="/">にしおピアノ教室</a>
     <p>${escapeHtml(site.area)}</p></div>
