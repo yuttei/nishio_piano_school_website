@@ -1,6 +1,6 @@
 # 内容フォルダの形式
 
-サイトの文章・料金・空き状況・イベント・リンク・写真は、コードとは別の「内容フォルダ」（非公開リポジトリ `website_content`）に置く。ビルドと開発サーバーは、骨組みの HTML（`index.html` など）に内容フォルダの本文や部品を差し込み、公開 4 ページ（ホーム・レッスン・イベント・無料体験）を作る。管理画面（`/admin/`）で保存した更新内容の扱いは [管理画面と Cloudflare Pages Functions の設計](admin-architecture.md) を参照すること。
+サイトの文章・料金・空き状況・イベント・リンク・写真は、コードとは別の「内容フォルダ」（非公開リポジトリ `website_content`）に置く。ビルドと開発サーバーは、骨組みの HTML（`index.html` など）に内容フォルダの本文や部品を差し込み、公開 4 ページ（ホーム・レッスン・イベント・無料体験）を作る。管理画面（`/admin/`）で保存した更新内容の扱いは [管理画面と Cloudflare Pages Functions の設計](admin-architecture.md)、`siteUrl` を使った SEO メタタグ・`robots.txt`・`sitemap.xml` の出力仕様は [技術的な SEO 対策の設計](seo.md) を参照すること。
 
 - 既定の置き場所：`website` の兄弟フォルダ（`../website_content`）
 - 使い方：内容フォルダを用意し、`npm run dev`・`npm run build` を実行
@@ -37,6 +37,7 @@ website_content/
 | --- | --- | --- |
 | `formatVersion` | 数値 | 形式の版。`1` だけを受け付ける |
 | `storageKeyPrefix` | 文字列 | 開発サーバー（`npm run dev`）で管理画面がブラウザー（`localStorage`）に保存するときのキー名の先頭。小文字の英字・数字・`-` だけ |
+| `siteUrl` | 文字列（任意） | 公開サイトの基準 URL（例：`https://nishio-piano-school.pages.dev`）。`https://` で始まるオリジン URL（パス・クエリ・ハッシュなし）を指定し、末尾の `/` を除いた形に正規化。省略または空文字のときは `canonical`・OGP・Twitter Card・JSON-LD・`sitemap.xml` を出力しない |
 | `notice` | 文字列 | ヘッダーの上に出すお知らせの帯。空文字なら帯を出さない |
 | `area` | 文字列 | フッターに出す所在地（地区）。空にできない |
 | `availabilityDemoNote` | 文字列 | 開発サーバーで、空き状況の更新日がないときに表の上に出す説明。空文字なら公式 LINE への案内を出す |
@@ -145,10 +146,11 @@ website_content/
 - `images/` の名前と種類、`public/images/` との名前の重なり
 - `pages/` の 4 ファイルがあり、必須の目印を含むこと
 
-仮想モジュール `virtual:site-content` と開発サーバーの動作：
+仮想モジュール `virtual:site-content` とビルド・開発サーバーの動作：
 
 - 仮想モジュール `virtual:site-content`（`site.json` と `data.json` の中身）は、開発サーバーと本番ビルドの両方で解決
 - 本番ビルドでは、管理画面（`src/content-store.ts`）と公開ページの即時反映（`src/live-content.ts`）が既定値（時間帯名・トップ写真の既定説明文・KV 未保存時の初期データ）として `virtual:site-content` を参照
+- 本番ビルドでは `dist/robots.txt` を毎回出力し、`siteUrl` が設定されているときは `dist/sitemap.xml` も出力（詳細は [技術的な SEO 対策の設計](seo.md) を参照）
 - 開発サーバーでは内容フォルダの変更を見張り、変わったら読み直してブラウザーを再読み込み
 
 ## 混入の検査

@@ -20,6 +20,9 @@ export interface Env {
   CF_ACCESS_TEAM_DOMAIN?: string
   CF_ACCESS_AUD?: string
   ALLOW_LOCAL_ADMIN_BYPASS?: string
+  // 公開サイトの正規ホスト名（例：example.com）。
+  // 独自ドメインへ移行したときなどに指定すると、それ以外のホスト名への応答に X-Robots-Tag: noindex, nofollow を付けます。
+  CANONICAL_HOST?: string
 }
 
 // KV に保存するときのキー名です。将来の形式変更に備えて :v1 を付けています。

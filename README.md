@@ -9,6 +9,7 @@
 - 公開中のサイト：<https://nishio-piano-school.pages.dev>
 - [内容フォルダの形式](docs/content-folder.md)
 - [管理画面と Cloudflare Pages Functions の設計](docs/admin-architecture.md)
+- [技術的な SEO 対策の設計](docs/seo.md)
 
 ## 管理画面でできる操作
 
@@ -48,15 +49,15 @@ npm run build && npm run dev:pages
 
 ## ビルドとデプロイ
 
-兄弟フォルダ `../website_content`（別の場所なら `SITE_CONTENT_DIR` で指定したフォルダ）を用意して `npm run build` を実行すると、フロントエンドと Functions の型チェック（`npm run check`）後に公開 4 ページと管理画面を `dist/` へ出力する。
+兄弟フォルダ `../website_content`（別の場所なら `SITE_CONTENT_DIR` で指定したフォルダ）を用意して `npm run build` を実行すると、フロントエンドと Functions の型チェック（`npm run check`）後に公開 4 ページ、管理画面、`robots.txt`、および `siteUrl` 設定時の `sitemap.xml` を `dist/` へ出力する。
 
 Cloudflare Pages へのデプロイは次を実行する。本番の KV Namespace ID や R2 バケット設定、Cloudflare Access の環境変数は公開リポジトリに置かないため、`wrangler.toml` は作成せず Cloudflare ダッシュボード側で管理する。
 
 ```sh
-npx wrangler pages deploy dist --project-name nishio-piano-school
+npx wrangler pages deploy dist --project-name nishio-piano-school --branch main
 ```
 
-必要なバインディングと環境変数の一覧は [管理画面と Cloudflare Pages Functions の設計](docs/admin-architecture.md) を参照すること。
+必要なバインディングと環境変数の一覧は [管理画面と Cloudflare Pages Functions の設計](docs/admin-architecture.md) および [技術的な SEO 対策の設計](docs/seo.md) を参照すること。
 
 ## ビルド時の microCMS 連携（任意）
 
